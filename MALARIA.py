@@ -190,21 +190,24 @@ class MALARIA(data.Dataset):
                 # GAM[0, cmin:cmax, rmin:rmax] = GAM[0, cmin:cmax, rmin:rmax] + h_gauss[0:cmax-cmin, 0:rmax-rmin]
                 GAM[category, cmin:cmax, rmin:rmax] = GAM[category, cmin:cmax, rmin:rmax] + h_gauss[0:cmax-cmin, 0:rmax-rmin]
 
-        plt.figure(1)
-        plt.imshow(img)
-        plt.imshow(GAM[4], cmap='gray', alpha=0.7)
+        # plt.figure(1)
+        # plt.imshow(img)
+        # plt.imshow(GAM[0], cmap='gray', alpha=0.7)
         # plt.show()
 
         downsampler = transforms.Compose([transforms.ToPILImage(), transforms.Resize((int(o_H / 8), int(o_W / 8)), interpolation=Image.LANCZOS)])
         #
-        GAM = downsampler(torch.Tensor(GAM[4]))
-        GAM = np.array(GAM)
-        GAM = (GAM / GAM.max()) * 1
-        # plt.figure(2)
-        # plt.imshow(img)
-        # # plt.show()
+        GAM_downsampled = np.zeros((len(object_categories), int(o_H / 8), int(o_W / 8)))
+        for i in range(len(object_categories)):
+            GAM_downsampled[i] = downsampler(torch.Tensor(GAM[i]))
+        # GAM = downsampler(torch.Tensor(GAM[4]))
+        GAM_downsampled = np.array(GAM_downsampled)
+        GAM_downsampled = (GAM_downsampled / GAM_downsampled.max()) * 1
         plt.figure(2)
-        plt.imshow(GAM, cmap='gray', alpha=0.8)
+        plt.imshow(img)
+        # # plt.show()
+        # plt.figure(2)
+        plt.imshow(GAM[0], cmap='jet', alpha=0.4)
         plt.show()
 
         if img.ndim == 2:
@@ -226,5 +229,5 @@ class MALARIA(data.Dataset):
 
 if __name__ == '__main__':
     train_dataset = MALARIA('', 'train', train=True)
-    x = train_dataset[0]
+    x = train_dataset[26]
     print('Done')
