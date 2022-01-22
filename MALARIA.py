@@ -156,6 +156,7 @@ class MALARIA(data.Dataset):
             for key in cells_counter:
                 num_cells[key] = cells_counter[key]
             total_cells_num = np.sum(num_cells)
+            num_cells = torch.Tensor(num_cells)
             # numCar = gt_boxes.shape[0]
 
             # prepare GAM image
@@ -203,12 +204,14 @@ class MALARIA(data.Dataset):
         # GAM = downsampler(torch.Tensor(GAM[4]))
         GAM_downsampled = np.array(GAM_downsampled)
         GAM_downsampled = (GAM_downsampled / GAM_downsampled.max()) * 1
-        plt.figure(2)
-        plt.imshow(img)
-        # # plt.show()
+
+        # Plot image and heatmap together
         # plt.figure(2)
-        plt.imshow(GAM[0], cmap='jet', alpha=0.4)
-        plt.show()
+        # plt.imshow(img)
+        # # # plt.show()
+        # # plt.figure(2)
+        # plt.imshow(GAM[4], cmap='jet', alpha=0.4)
+        # plt.show()
 
         if img.ndim == 2:
             img = img[np.newaxis]
@@ -218,7 +221,7 @@ class MALARIA(data.Dataset):
         normalize = transforms.Normalize(mean=[0.39895892, 0.42411209, 0.40939609], std=[0.19080092, 0.18127358, 0.19950577])
         img = normalize(torch.from_numpy(img))
 
-        return img, GAM, num_cells # Maybe return total_cells_num instead?
+        return img, GAM_downsampled, num_cells # Maybe return total_cells_num instead?
 
     def __len__(self):
         return len(self.ids)
