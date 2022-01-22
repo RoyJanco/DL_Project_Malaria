@@ -6,14 +6,13 @@ import torchvision.transforms as transforms
 import torch.optim as optim
 import visdom
 import matplotlib as mpl
-from matplotlib import pyplot as plot
+from matplotlib import pyplot as plt
 from MALARIA import MALARIA
 import localizerVgg
 
 
 from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
-from matplotlib import pyplot as plt
 
 
 def detect_peaks(image):
@@ -72,6 +71,21 @@ def plot_peak_maps(max_filter, peak_map, image):
         plt.imshow(max_filter[i])
         plt.subplot(3, 3, 3*i+3)
         plt.imshow(peak_map[i])
+    plt.show()
+
+
+def plot_maps(data, heatmap_gt, heatmap_pred):
+    image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
+    plt.figure(1)
+    plt.subplot(1, 3, 1)
+    plt.imshow(image)
+    plt.title('Image')
+    plt.subplot(1, 3, 2)
+    plt.imshow(heatmap_gt)
+    plt.title('GT heatmap')
+    plt.subplot(1, 3, 3)
+    plt.imshow(heatmap_pred)
+    plt.title('Predicted heatmap')
     plt.show()
 
 
@@ -145,6 +159,9 @@ for epoch in range(35):
         # cMap = (cMap - cMap.min()) / (cMap.max() - cMap.min())
         # cMap[cMap < 0.1] = 0
         # peakMAP = detect_peaks(cMap)
+
+        if batch_idx % 10 == 0:
+            plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy())
 
         # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
         MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
