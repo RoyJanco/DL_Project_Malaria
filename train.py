@@ -74,16 +74,19 @@ def plot_peak_maps(max_filter, peak_map, image):
     plt.show()
 
 
-def plot_maps(data, heatmap_gt, heatmap_pred):
+def plot_maps(data, heatmap_gt, heatmap_pred, peak_map):
     image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
     plt.figure(1)
-    plt.subplot(1, 3, 1)
+    plt.subplot(2, 2, 1)
     plt.imshow(image)
     plt.title('Image')
-    plt.subplot(1, 3, 2)
+    plt.subplot(2, 2, 2)
+    plt.imshow(peak_map)
+    plt.title('peak_map')
+    plt.subplot(2, 2, 3)
     plt.imshow(heatmap_gt)
     plt.title('GT heatmap')
-    plt.subplot(1, 3, 3)
+    plt.subplot(2, 2, 4)
     plt.imshow(heatmap_pred)
     plt.title('Predicted heatmap')
     plt.show()
@@ -161,13 +164,14 @@ for epoch in range(35):
         # peakMAP = detect_peaks(cMap)
 
         if batch_idx % 10 == 0:
-            plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy())
+            plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0])
 
         # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
         MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
         GAM = GAM.view(GAM.shape[0], GAM.shape[1], -1)
 
-        fark = abs(np.sum(peakMAPs, axis=(1,2)) - num_cells.numpy())
+        pred_num_cells = np.sum(peakMAPs, axis=(1,2))
+        fark = abs(pred_num_cells - num_cells.numpy())
 
         loss = criterionGAM(MAP, GAM)
         optimizer_ft.zero_grad()
@@ -178,5 +182,6 @@ for epoch in range(35):
         if batch_idx % 1 == 0: # was 20
             print('Epoch: [{0}][{1}/{2}]\t' 'Loss: {3}\ AE:{4}'
                  .format(epoch, batch_idx, len(train_loader), loss,  abs(fark)))
+            print(f'Predicted number of RBC: {pred_num_cells[0]}. GT: {num_cells[0]}')
 
     torch.save(model.state_dict(), 'trained_model')

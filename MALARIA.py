@@ -104,7 +104,7 @@ class MALARIA(data.Dataset):
         path = os.path.join(self.path_images, id_)
         img = Image.open(os.path.join(path)).convert('RGB')
         if self.train:
-            if random.random() > 0.5:#0.5
+            if random.random() > 0.5:#0.5 - TODO: Check what is this augmentation
                 transformsColor = transforms.Compose([transforms.ColorJitter(hue=0.2, saturation=0.2)])
                 img = transformsColor(img)
         # img = np.asarray(img, dtype=np.float32)
@@ -136,10 +136,10 @@ class MALARIA(data.Dataset):
             gt_boxes[:, 2] = gt_boxes[:, 0] + gt_boxes[:, 2] # rescaled maximum row
             gt_boxes[:, 3] = gt_boxes[:, 1] + gt_boxes[:, 3] # rescaled maximum col
 
-            if self.train:
-                if random.random() > 1:
-                    transforms_aug = Sequence([RandomRotate(45)])
-                    img, gt_boxes = transforms_aug(img, gt_boxes[:,:4])
+            # if self.train:
+            #     if random.random() > 1:
+            #         transforms_aug = Sequence([RandomRotate(45)])
+            #         img, gt_boxes = transforms_aug(img, gt_boxes[:,:4])
             gt_boxes = gt_boxes / dSR
             gt_boxes[:, 0::2] = np.clip(gt_boxes[:, 0::2], 0, int(o_W / dSR))
             gt_boxes[:, 1::2] = np.clip(gt_boxes[:, 1::2], 0, int(o_H / dSR))
