@@ -14,6 +14,8 @@ import localizerVgg
 from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
+# Hyper parameters
+BETA = 0.9999
 
 def detect_peaks(image):
     neighborhood = generate_binary_structure(2, 2)
@@ -54,11 +56,13 @@ class mcloss(nn.Module):
         super(mcloss, self).__init__()
 
     """Forward: inputs y_pred and y with shape [B, C, H, W]"""
-    def forward(self, y_pred, y):
-        # y_pred = y_pred.view(y_pred.shape[0], -1)
-        # y = y.view(y.shape[0], -1)
+    def forward(self, y_pred, y, Eny):
         y_pred = torch.abs(y_pred - y.float())
-        ret = torch.sum(y_pred) / (y_pred.shape[0]*y_pred.shape[1])
+        y_pred_sum = torch.sum(y_pred, axis=2)
+        # Divide each class by Effective number of samples
+        ret = torch.div(y_pred_sum, Eny)
+        # Sum over all elements and normalize
+        ret = torch.sum(ret) / torch.numel(y_pred)
         return ret
 
 
@@ -92,6 +96,19 @@ def plot_maps(data, heatmap_gt, heatmap_pred, peak_map):
     plt.show()
 
 
+# def plot_heatmaps(heatmap_gt, heatmap_pred):
+#     plt.figure()
+#     num_plots = heatmap_gt.shape[0]
+#     for i in range(num_plots):
+#         plt.subplot(2, num_plots, i+1)
+#         plt.imshow(heatmap_gt[i])
+#         plt.title(f'GT - class [{i}]')
+#         plt.subplot(2, num_plots, i+num_plots)
+#         plt.imshow(heatmap_pred[i])
+#         plt.title(f'Pred - class [{i}]')
+#     plt.show()
+
+
 def vis_MAP(MAP, vis, epoch, batch_idx, mapId, upsampler):
     M1 = MAP.data.cpu().contiguous().numpy().copy()
     M1_norm = (M1[0,] - M1[0,].min()) / (M1[0,].max() - M1[0,].min())
@@ -109,6 +126,27 @@ def vis_MAP(MAP, vis, epoch, batch_idx, mapId, upsampler):
     # vis.image(np.transpose(b, (2, 0, 1)), opts=dict(
     #     title=str(epoch) + '_' + str(batch_idx) + '_' + str(mapId) + '_heatmap'))
 
+
+def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
+    image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
+    plt.figure(1)
+    plt.imshow(image)
+    plt.title('Image')
+    plt.figure(2)
+    num_plots = heatmap_gt.shape[0]
+    for i in range(num_plots):
+        plt.subplot(3, num_plots, i+1)
+        plt.imshow(heatmap_gt[i])
+        plt.title(f'GT - class [{i}]')
+        plt.subplot(3, num_plots, i+num_plots+1)
+        plt.imshow(heatmap_pred[i])
+        plt.title(f'Pred - class [{i}]')
+        plt.subplot(3, num_plots, i + 2*num_plots + 1)
+        plt.imshow(peak_maps[i])
+        plt.title(f'Peak maps - class [{i}]')
+    plt.show()
+
+
 vis = visdom.Visdom(server='http://localhost', port='8097')
 cm_jet = mpl.cm.get_cmap('jet')
 
@@ -123,6 +161,9 @@ model = model.to(device)
 
 # train_dataset = CARPK('', 'train', train=True)
 train_dataset = MALARIA('', 'train', train=True)
+# Count instances of each class
+ny = torch.DoubleTensor((list(train_dataset.instances_count().values()))).to(device)
+Eny = (1 - BETA**ny)/(1 - BETA)
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
@@ -163,8 +204,9 @@ for epoch in range(35):
         # cMap[cMap < 0.1] = 0
         # peakMAP = detect_peaks(cMap)
 
-        if batch_idx % 10 == 0:
-            plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0])
+        if batch_idx % 2 == 0:
+            # plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0])
+            plot_heatmaps(data, GAM[0], MAP[0].detach().numpy(), peakMAPs)
 
         # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
         MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
@@ -173,15 +215,16 @@ for epoch in range(35):
         pred_num_cells = np.sum(peakMAPs, axis=(1,2))
         fark = abs(pred_num_cells - num_cells.numpy())
 
-        loss = criterionGAM(MAP, GAM)
+        loss = criterionGAM(MAP, GAM, Eny)
         optimizer_ft.zero_grad()
         loss.backward()
         optimizer_ft.step()
 
 
         if batch_idx % 1 == 0: # was 20
-            print('Epoch: [{0}][{1}/{2}]\t' 'Loss: {3}\ AE:{4}'
-                 .format(epoch, batch_idx, len(train_loader), loss,  abs(fark)))
+            # print('Epoch: [{0}][{1}/{2}]\t' 'Loss: {3}\ AE:{4}'
+            #      .format(epoch, batch_idx, len(train_loader), loss,  abs(fark)))
+            print(f'Epoch: [{epoch}][{batch_idx}/{len(train_loader)}]\t loss: {loss: .3e}, AE:{fark}')
             print(f'Predicted number of RBC: {pred_num_cells[0]}. GT: {num_cells[0]}')
 
     torch.save(model.state_dict(), 'trained_model')

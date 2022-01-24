@@ -76,6 +76,21 @@ def plot_peak_maps(max_filter, peak_map, image):
     plt.show()
 
 
+def plot_heatmaps(heatmap_gt, heatmap_pred, peak_maps):
+    plt.figure()
+    num_plots = heatmap_gt.shape[0]
+    for i in range(num_plots):
+        plt.subplot(3, num_plots, i+1)
+        plt.imshow(heatmap_gt[i])
+        plt.title(f'GT - class [{i}]')
+        plt.subplot(3, num_plots, i+num_plots+1)
+        plt.imshow(heatmap_pred[i])
+        plt.title(f'Pred - class [{i}]')
+        plt.subplot(3, num_plots, i + 2*num_plots + 1)
+        plt.imshow(peak_maps[i])
+        plt.title(f'Peak maps - class [{i}]')
+    plt.show()
+
 cm_jet = mpl.cm.get_cmap('jet')
 
 model = localizerVgg.localizervgg16(pretrained=True)
@@ -89,7 +104,7 @@ state_dict = torch.load('model_MALARIA.pt', map_location=torch.device(device))
 model.load_state_dict(state_dict)
 
 train_dataset = MALARIA('', 'train', train=True)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=0)
 
 data, GAM, num_cells = next(iter(train_loader))
 data, GAM, num_cells = data.to(device, dtype=torch.float),  GAM.to(device), num_cells.to(device)
@@ -125,6 +140,7 @@ with torch.no_grad():
 
 
     plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    plot_heatmaps(GAM[0], MAP[0].detach().numpy(), peakMAPs)
 
     pred_num_cells = np.sum(peakMAPs, axis=(1, 2))
     fark = abs(pred_num_cells - num_cells.numpy())

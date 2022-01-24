@@ -229,8 +229,19 @@ class MALARIA(data.Dataset):
     def get_number_classes(self):
         return len(self.classes)
 
+    def instances_count(self):
+        """Counts number of instances from each class"""
+        counter = {'red blood cell': 0, 'leukocyte': 0, 'gametocyte': 0, 'ring': 0, 'trophozoite': 0,
+                           'schizont': 0, 'difficult': 0}
+        for img in self.bbox.values():
+            for bbox in img:
+                counter[bbox['category']] += 1
+        return counter
+
 
 if __name__ == '__main__':
     train_dataset = MALARIA('', 'train', train=True)
     x = train_dataset[26]
+    instances = train_dataset.instances_count()
+
     print('Done')
