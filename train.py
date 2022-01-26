@@ -206,14 +206,14 @@ for epoch in range(35):
 
         if batch_idx % 2 == 0:
             # plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0])
-            plot_heatmaps(data, GAM[0], MAP[0].detach().numpy(), peakMAPs)
+            plot_heatmaps(data, GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs)
 
         # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
         MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
         GAM = GAM.view(GAM.shape[0], GAM.shape[1], -1)
 
         pred_num_cells = np.sum(peakMAPs, axis=(1,2))
-        fark = abs(pred_num_cells - num_cells.numpy())
+        fark = abs(pred_num_cells - num_cells.cpu().detach().numpy())
 
         loss = criterionGAM(MAP, GAM, Eny)
         optimizer_ft.zero_grad()

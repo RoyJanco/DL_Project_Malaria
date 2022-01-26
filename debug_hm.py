@@ -42,6 +42,7 @@ def detect_peaks_multi_channels(image):
 
 def plot_maps(data, heatmap_gt, heatmap_pred, peak_map, peak_map_gt):
     image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
+    image = (image - image.min()) / (image.max() - image.min())
     plt.figure(1)
     plt.imshow(image)
     plt.title('Image')
@@ -138,12 +139,11 @@ with torch.no_grad():
     # plt.imshow(local_max[0])
     # plt.title('local_max combina')
 
-
-    plot_maps(data, GAM[0,0], MAP[0,0].detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
-    plot_heatmaps(GAM[0], MAP[0].detach().numpy(), peakMAPs)
+    plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    plot_heatmaps(GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs)
 
     pred_num_cells = np.sum(peakMAPs, axis=(1, 2))
-    fark = abs(pred_num_cells - num_cells.numpy())
+    fark = abs(pred_num_cells - num_cells.cpu().detach().numpy())
 
     print(f'Predicted number of RBC: {pred_num_cells[0]}. GT: {num_cells[0,0]}')
 
