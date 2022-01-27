@@ -66,6 +66,36 @@ class mcloss(nn.Module):
         return ret
 
 
+class l2_loss(nn.Module):
+    def __init__(self):
+        super(l2_loss, self).__init__()
+
+    """Forward: inputs y_pred and y with shape [B, C, H, W]"""
+    def forward(self, y_pred, y, Eny):
+        y_pred = torch.square(y_pred - y.float())
+        y_pred_sum = torch.sum(y_pred, axis=2)
+        # Divide each class by Effective number of samples
+        ret = torch.div(y_pred_sum, Eny)
+        # Sum over all elements and normalize
+        ret = torch.sum(ret) / torch.numel(y_pred)
+        return ret
+
+
+class l3_loss(nn.Module):
+    def __init__(self):
+        super(l3_loss, self).__init__()
+
+    """Forward: inputs y_pred and y with shape [B, C, H, W]"""
+    def forward(self, y_pred, y, Eny):
+        y_pred = (torch.abs(y_pred - y.float()))**3
+        y_pred_sum = torch.sum(y_pred, axis=2)
+        # Divide each class by Effective number of samples
+        ret = torch.div(y_pred_sum, Eny)
+        # Sum over all elements and normalize
+        ret = torch.sum(ret) / torch.numel(y_pred)
+        return ret
+
+
 def plot_peak_maps(max_filter, peak_map, image):
     plt.figure(1)
     for i in range(3):
@@ -168,6 +198,8 @@ Eny = (1 - BETA**ny)/(1 - BETA)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
 criterionGAM = mcloss()
+# criterionGAM = l2_loss()
+# criterionGAM = l3_loss()
 
 optimizer_ft = optim.Adam(model.parameters(), lr=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.1)

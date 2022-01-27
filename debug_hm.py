@@ -100,12 +100,12 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 model = model.to(device)
-state_dict = torch.load('model_MALARIA.pt', map_location=torch.device(device))
+state_dict = torch.load('model_l3_b0_e1.pt', map_location=torch.device(device))
 # print(state_dict.keys())
 model.load_state_dict(state_dict)
 
 train_dataset = MALARIA('', 'train', train=True)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=0)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
 data, GAM, num_cells = next(iter(train_loader))
 data, GAM, num_cells = data.to(device, dtype=torch.float),  GAM.to(device), num_cells.to(device)
