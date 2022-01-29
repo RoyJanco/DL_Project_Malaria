@@ -22,22 +22,36 @@ import cv2 as cv
 # plt.imshow(equ)
 # plt.show()
 
-def detect_peaks_multi_channels(image):
+def detect_peaks_multi_channels(image): # ***** BUG with maximum filter *****
     neighborhood = generate_binary_structure(2, 2)
     local_max = maximum_filter(image, size=3) == image
     max_filter = maximum_filter(image, size=3)  # We don't need it
-    # plot_peak_maps(max_filter, local_max, image)
+    plot_peak_maps(max_filter, local_max, image)
     background = (image == 0)
     eroded_background = np.zeros(shape=background.shape, dtype=bool)
     for i in range(image.shape[0]):
         eroded_background[i] = binary_erosion(background[i], structure=neighborhood, border_value=1)
     detected_peaks = local_max ^ eroded_background
     # detected_peaks = (local_max ^ eroded_background).astype(np.int) - eroded_background.astype(np.int)
-    # plot_peak_maps(max_filter, detected_peaks, image)
+    plot_peak_maps(max_filter, detected_peaks, image)
 
     return detected_peaks # Original
     # return local_max, detected_peaks
 
+
+def detect_peaks(image):
+    detected_peaks = np.zeros_like(image)
+    local_max = np.zeros_like(image, dtype=bool)
+    max_filter = np.zeros_like(image)
+    neighborhood = generate_binary_structure(2, 2)
+    for i in range(image.shape[0]):
+        max_filter[i] = maximum_filter(image[i], footprint=neighborhood)
+        local_max[i] = maximum_filter(image[i], footprint=neighborhood) == image[i]
+        background = (image[i] == 0)
+        eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
+        detected_peaks[i] = local_max[i] ^ eroded_background
+    # plot_peak_maps(max_filter, local_max, image)
+    return detected_peaks
 
 
 def plot_maps(data, heatmap_gt, heatmap_pred, peak_map, peak_map_gt):
@@ -70,10 +84,13 @@ def plot_peak_maps(max_filter, peak_map, image):
     for i in range(3):
         plt.subplot(3, 3, 3*i+1)
         plt.imshow(image[i])
+        plt.title('MAP')
         plt.subplot(3, 3, 3*i+2)
         plt.imshow(max_filter[i])
+        plt.title('max filter')
         plt.subplot(3, 3, 3*i+3)
         plt.imshow(peak_map[i])
+        plt.title('peak map')
     plt.show()
 
 
@@ -99,10 +116,11 @@ model = localizerVgg.localizervgg16(pretrained=True)
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-model = model.to(device)
-state_dict = torch.load('model_l3_b0_e1.pt', map_location=torch.device(device))
+# state_dict = torch.load('model_l2_b0_e10.pt', map_location=torch.device(device))
+state_dict = torch.load('model_aw_wm_b09999_e1.pt', map_location=torch.device(device))
 # print(state_dict.keys())
 model.load_state_dict(state_dict)
+model = model.to(device)
 
 train_dataset = MALARIA('', 'train', train=True)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
@@ -119,13 +137,17 @@ with torch.no_grad():
     cMap_min = cMap.min(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap_max = cMap.max(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap = (cMap - cMap_min) / (cMap_max - cMap_min)
+    # thr_avg = np.mean(cMap, axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap[cMap < thr] = 0
 
     cMap_gt = GAM[0].data.cpu().numpy()
     cMap_gt[cMap_gt < thr] = 0
-    # Detect peaks in the predicted heat map:
-    peakMAPs = detect_peaks_multi_channels(cMap)
-    peakMAPs_gt = detect_peaks_multi_channels(cMap_gt)
+    # Detect peaks in the predicted heat map BUG!!!!!!!!!!!!!!!!!!!!!!!!
+    # peakMAPs = detect_peaks_multi_channels(cMap)
+    # peakMAPs_gt = detect_peaks_multi_channels(cMap_gt)
+
+    peakMAPs = detect_peaks(cMap)
+    peakMAPs_gt = detect_peaks(cMap_gt)
 
     # Combina
     # local_max, peakMAPs = detect_peaks_multi_channels(cMap)
@@ -139,12 +161,13 @@ with torch.no_grad():
     # plt.imshow(local_max[0])
     # plt.title('local_max combina')
 
-    plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    # plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
     plot_heatmaps(GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs)
 
     pred_num_cells = np.sum(peakMAPs, axis=(1, 2))
     fark = abs(pred_num_cells - num_cells.cpu().detach().numpy())
 
     print(f'Predicted number of RBC: {pred_num_cells[0]}. GT: {num_cells[0,0]}')
+    print(f'AE {fark}')
 
 print('Done')
