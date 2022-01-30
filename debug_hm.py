@@ -116,7 +116,7 @@ model = localizerVgg.localizervgg16(pretrained=True)
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-state_dict = torch.load('model_l2_b0_e10.pt', map_location=torch.device(device))
+state_dict = torch.load('L2_WM_BN_B09.pt', map_location=torch.device(device))
 # state_dict = torch.load('model_aw_wm_b09999_e1.pt', map_location=torch.device(device))
 # print(state_dict.keys())
 model.load_state_dict(state_dict)
@@ -137,6 +137,7 @@ with torch.no_grad():
     cMap_min = cMap.min(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap_max = cMap.max(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap = (cMap - cMap_min) / (cMap_max - cMap_min)
+    # cMap_copy = cMap.copy()
     # thr_avg = np.mean(cMap, axis=(1,2)).reshape((cMap.shape[0], 1, 1))
     cMap[cMap < thr] = 0
 
@@ -161,8 +162,15 @@ with torch.no_grad():
     # plt.imshow(local_max[0])
     # plt.title('local_max combina')
 
-    plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    # plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
+    image = (image - image.min()) / (image.max() - image.min())
+    plt.figure(1)
+    plt.imshow(image)
+    plt.title('Image')
     plot_heatmaps(GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs)
+    # plot_heatmaps(GAM[0].cpu().detach().numpy(), cMap_copy, peakMAPs)
+
 
     pred_num_cells = np.sum(peakMAPs, axis=(1, 2))
     fark = abs(pred_num_cells - num_cells.cpu().detach().numpy())

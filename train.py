@@ -15,7 +15,7 @@ from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion, grey_dilation
 
 # Hyper parameters
-BETA = 0.9999
+BETA = 0.999
 
 # def detect_peaks(image):
 #     neighborhood = generate_binary_structure(2, 2)
@@ -279,6 +279,8 @@ train_dataset = MALARIA('', 'train', train=True)
 ny = torch.DoubleTensor((list(train_dataset.instances_count().values()))).to(device)
 Eny = (1 - BETA**ny)/(1 - BETA)
 W = torch.unsqueeze(max(Eny) / Eny, dim=1)
+# W = torch.unsqueeze(1 / (1 - BETA**ny), dim=1)
+# W2 = torch.unsqueeze(max(ny) / ny, dim=1)
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
