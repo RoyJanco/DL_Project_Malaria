@@ -96,6 +96,19 @@ class l2_loss(nn.Module):
         return ret
 
 
+class l2_loss_wm(nn.Module):
+    def __init__(self):
+        super(l2_loss_wm, self).__init__()
+
+    """Forward: inputs y_pred and y with shape [B, C, H, W]"""
+    def forward(self, y_pred, y, weight_map=1):
+        y_pred = torch.square(y_pred - y.float()) * weight_map
+        y_pred_sum = torch.sum(y_pred, axis=2)
+        # Sum over all elements and normalize
+        ret = torch.sum(y_pred_sum) / torch.numel(y_pred)
+        return ret
+
+
 class l3_loss(nn.Module):
     def __init__(self):
         super(l3_loss, self).__init__()
@@ -180,6 +193,7 @@ def plot_peak_maps(max_filter, peak_map, image):
 
 def plot_maps(data, heatmap_gt, heatmap_pred, peak_map):
     image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
+    image_norm = (image - image.min()) / (image.max() - image.min())
     plt.figure(1)
     plt.subplot(2, 2, 1)
     plt.imshow(image)
@@ -270,9 +284,11 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=
 
 # criterionGAM = mcloss()
 # criterionGAM = l2_loss()
+criterionGAM = l2_loss_wm()
+
 # criterionGAM = l3_loss()
 # criterionGAM = shrinkage_loss(a=10, c=0.2)
-criterionGAM = AdaptiveWingLoss()
+# criterionGAM = AdaptiveWingLoss()
 
 optimizer_ft = optim.Adam(model.parameters(), lr=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.1)
@@ -335,7 +351,7 @@ for epoch in range(35):
         fark = abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
 
         # loss = criterionGAM(MAP, GAM, Eny)
-        loss = criterionGAM(MAP, GAM, weight_map*W + 1) # For AW loss
+        loss = criterionGAM(MAP, GAM, weight_map*W + 1) # For AW loss and l2_wm
 
         optimizer_ft.zero_grad()
         loss.backward()

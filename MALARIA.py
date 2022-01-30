@@ -103,11 +103,11 @@ class MALARIA(data.Dataset):
         # id_ = '164'
         path = os.path.join(self.path_images, id_)
         img = Image.open(os.path.join(path)).convert('RGB')
-        if self.train:
-            if random.random() > 0: #0.5 - TODO: Check what is this augmentation
-                # transformsColor = transforms.Compose([transforms.ColorJitter(hue=0.2, saturation=0.2)])
-                transformsColor = transforms.Compose([transforms.ColorJitter(saturation=0.2, contrast=(0, 0.3))])
-                img = transformsColor(img)
+        # if self.train:
+        #     if random.random() > 0: #0.5 - TODO: Check what is this augmentation
+        #         # transformsColor = transforms.Compose([transforms.ColorJitter(hue=0.2, saturation=0.2)])
+        #         transformsColor = transforms.Compose([transforms.ColorJitter(contrast=(0, 0.3))])
+        #         img = transformsColor(img)
         img = np.asarray(img, dtype=np.float32)
         img = np.asarray(img, dtype=np.int32)
 

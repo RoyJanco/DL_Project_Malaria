@@ -84,11 +84,11 @@ if __name__ == '__main__':
 
     # Load pretrained model
     model = localizerVgg.localizervgg16(pretrained=True)
-    state_dict = torch.load('model_aw_wm_b09999_e1.pt', map_location=torch.device(device))
+    state_dict = torch.load('model_l2_b0_e10.pt', map_location=torch.device(device))
     model.load_state_dict(state_dict)
     model = model.to(device)
 
-    data_set = MALARIA('', 'test', train=False)
+    data_set = MALARIA('', 'train', train=True)
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=1, shuffle=False, num_workers=0)
     num_classes = len(data_set.classes)
     model.eval()
@@ -122,10 +122,10 @@ if __name__ == '__main__':
             print(f'[{batch_idx}/{len(data_loader)}]\t AE: {l}')
 
             # Save images
-            # if batch_idx % 100 == 0:
-            #     M1_norm = normalize_map(MAP)
-            #     MAP_upsampled = upsample_map(M1_norm, dsr=8)
-            #     save_images(MAP_upsampled, peakMAPs, batch_idx)
+            if batch_idx % 100 == 0:
+                M1_norm = normalize_map(MAP)
+                MAP_upsampled = upsample_map(M1_norm, dsr=8)
+                save_images(MAP_upsampled, peakMAPs, batch_idx)
 
 
         print('MAE:', ae / len(data_loader))
