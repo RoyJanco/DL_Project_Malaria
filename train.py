@@ -40,22 +40,19 @@ def detect_peaks(image):
     return detected_peaks
 
 
-
-def detect_peaks_multi_channels_batch(image): # HAS BUG
-    # Loop for each image in batch
+def detect_peaks_multi_channels_batch(image):  # TODO: Make this function available in only one script
     detected_peaks = np.zeros_like(image)
     neighborhood = generate_binary_structure(2, 2)
-    for ii in range(image.shape[0]):
-        local_max = maximum_filter(image[ii], size=3) == image[ii]
-        max_filter = maximum_filter(image[ii], size=3) # We don't need it
-        # plot_peak_maps(max_filter, local_max, image[ii])
-        background = (image[ii] == 0)
-        eroded_background = np.zeros(shape=background.shape, dtype=bool)
-        for i in range(image.shape[0]):
-            eroded_background[i] = binary_erosion(background[i], structure=neighborhood, border_value=1)
-        detected_peaks[ii] = local_max ^ eroded_background
-        # plot_peak_maps(max_filter, detected_peaks, image)
+    # Loop for each image in batch
+    for i in range(image.shape[0]):
+        # Loop over classes per image
+        for j in range(image.shape[1]):
+            local_max = maximum_filter(image[i, j], footprint=neighborhood) == image[i, j]
+            background = (image[i, j] == 0)
+            eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
+            detected_peaks[i, j] = local_max ^ eroded_background
     return detected_peaks
+
 
 class nllloss(nn.Module):
     def __init__(self):

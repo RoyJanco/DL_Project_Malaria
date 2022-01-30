@@ -88,7 +88,7 @@ if __name__ == '__main__':
     model.load_state_dict(state_dict)
     model = model.to(device)
 
-    data_set = MALARIA('', 'train', train=True)
+    data_set = MALARIA('', 'test', train=False)
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=1, shuffle=False, num_workers=0)
     num_classes = len(data_set.classes)
     model.eval()

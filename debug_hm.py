@@ -12,14 +12,14 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 import numpy as np
 import cv2 as cv
 
-# path = 'MALARIA/Images/0ab56f9a-846d-49e2-a617-c6cc477fdfad.png'
+# path = 'MALARIA/Images/4da8f6c5-5f85-4280-92d0-1ba008e8c404.jpg'
 # img = cv.imread(path,0)
 # equ = cv.equalizeHist(img)
 # res = np.hstack((img,equ)) #stacking images side-by-side
 # plt.figure(1)
-# plt.imshow(img)
+# plt.imshow(img, cmap='gray')
 # plt.figure(2)
-# plt.imshow(equ)
+# plt.imshow(equ, cmap='gray')
 # plt.show()
 
 def detect_peaks_multi_channels(image): # ***** BUG with maximum filter *****
@@ -123,7 +123,7 @@ model.load_state_dict(state_dict)
 model = model.to(device)
 
 train_dataset = MALARIA('', 'train', train=True)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=0)
 
 data, GAM, num_cells = next(iter(train_loader))
 data, GAM, num_cells = data.to(device, dtype=torch.float),  GAM.to(device), num_cells.to(device)
@@ -161,7 +161,7 @@ with torch.no_grad():
     # plt.imshow(local_max[0])
     # plt.title('local_max combina')
 
-    # plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
+    plot_maps(data, GAM[0,0].cpu().detach().numpy(), MAP[0,0].cpu().detach().numpy(), peakMAPs[0], peakMAPs_gt[0])
     plot_heatmaps(GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs)
 
     pred_num_cells = np.sum(peakMAPs, axis=(1, 2))
