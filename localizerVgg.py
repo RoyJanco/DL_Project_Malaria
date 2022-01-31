@@ -181,7 +181,7 @@ def vgg16(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg16', 'D', False, pretrained, progress, **kwargs)
 
-def localizervgg16(pretrained=False, progress=True, dsr=8, **kwargs):
+def localizervgg16(num_classes, pretrained=False, progress=True, dsr=8,  **kwargs):
     vgg = _vgg('vgg16', 'D', False, pretrained, progress, **kwargs)
     if dsr == 4:
         vgg.features[30] = nn.MaxPool2d(kernel_size=1, stride=1)
@@ -196,7 +196,7 @@ def localizervgg16(pretrained=False, progress=True, dsr=8, **kwargs):
         vgg.features[23] = nn.MaxPool2d(kernel_size=2, stride=2)
         vgg.features[16] = nn.MaxPool2d(kernel_size=2, stride=2)
 
-    locVGG = localizerVGG(vgg.features, num_classes=7) # was num_classes=1
+    locVGG = localizerVGG(vgg.features, num_classes=num_classes) # was num_classes=1
     return locVGG
 
 

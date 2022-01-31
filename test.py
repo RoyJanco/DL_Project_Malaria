@@ -89,7 +89,10 @@ if __name__ == '__main__':
     model = model.to(device)
 
     data_set = MALARIA('', 'train', train=True)
-    data_loader = torch.utils.data.DataLoader(data_set, batch_size=1, shuffle=False, num_workers=0)
+    # Split dataset to train and test
+    split_train, split_test = torch.utils.data.random_split(data_set, [1100, 108], generator=torch.Generator().manual_seed(42))
+
+    data_loader = torch.utils.data.DataLoader(split_test, batch_size=1, shuffle=False, num_workers=0)
     num_classes = len(data_set.classes)
     model.eval()
     thr = 0.5

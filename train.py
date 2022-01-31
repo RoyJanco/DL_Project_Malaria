@@ -7,7 +7,8 @@ import torch.optim as optim
 import visdom
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-from MALARIA import MALARIA
+# from MALARIA import MALARIA
+from MALARIA2 import MALARIA
 import localizerVgg
 
 
@@ -179,6 +180,14 @@ def generate_weight_map(heatmap):
     return weight_map
 
 
+def merge_weight_map(w_map):
+    w_map = w_map.astype(bool)
+    for i in range(w_map.shape[0]):
+        w_merged = np.bitwise_or.reduce(w_map[i, 1:w_map.shape[1]], axis=0)
+        w_map[i, 1:w_map.shape[1]] = w_merged
+    return w_map
+
+
 def plot_peak_maps(max_filter, peak_map, image):
     plt.figure(1)
     for i in range(3):
@@ -193,7 +202,7 @@ def plot_peak_maps(max_filter, peak_map, image):
 
 def plot_maps(data, heatmap_gt, heatmap_pred, peak_map):
     image = data.cpu().numpy().squeeze().transpose(1, 2, 0)
-    image_norm = (image - image.min()) / (image.max() - image.min())
+    image = (image - image.min()) / (image.max() - image.min())
     plt.figure(1)
     plt.subplot(2, 2, 1)
     plt.imshow(image)
@@ -234,7 +243,7 @@ def vis_MAP(MAP, vis, epoch, batch_idx, mapId, upsampler):
     vis.image(np.transpose(b0, (2, 0, 1)), opts=dict(
         title=str(epoch) + '_' + str(batch_idx) + '_' + str(mapId) + '_heatmap'))
 
-    # This doesn't work TODO: check why
+    # This doesn't work - not relevant because we are not using VISDOM
     # b = np.uint8(cm_jet(np.array(b)) * 255)
     # b = b[0] # Select which class to visuallize
     # vis.image(np.transpose(b, (2, 0, 1)), opts=dict(
@@ -243,6 +252,7 @@ def vis_MAP(MAP, vis, epoch, batch_idx, mapId, upsampler):
 
 def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
     image = image.cpu().numpy().transpose(1, 2, 0)
+    image = (image - image.min()) / (image.max() - image.min())
     plt.figure(1)
     plt.imshow(image)
     plt.title('Image')
@@ -264,7 +274,12 @@ def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
 # vis = visdom.Visdom(server='http://localhost', port='8097')
 cm_jet = mpl.cm.get_cmap('jet')
 
-model = localizerVgg.localizervgg16(pretrained=True)
+dataset = MALARIA('', 'train', train=True, num_classes=2)
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1100, 108], generator=torch.Generator().manual_seed(42))
+
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
+
+model = localizerVgg.localizervgg16(num_classes=train_dataset.dataset.get_number_classes(), pretrained=True)
 # model.cuda()
 
 
@@ -273,16 +288,13 @@ device = torch.device("cuda" if use_cuda else "cpu")
 
 model = model.to(device)
 
-# train_dataset = CARPK('', 'train', train=True)
-train_dataset = MALARIA('', 'train', train=True)
 # Count instances of each class
-ny = torch.DoubleTensor((list(train_dataset.instances_count().values()))).to(device)
+ny = torch.DoubleTensor((list(train_dataset.dataset.instances_count().values()))).to(device)
 Eny = (1 - BETA**ny)/(1 - BETA)
 W = torch.unsqueeze(max(Eny) / Eny, dim=1)
 # W = torch.unsqueeze(1 / (1 - BETA**ny), dim=1)
 # W2 = torch.unsqueeze(max(ny) / ny, dim=1)
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
 
 # criterionGAM = mcloss()
 # criterionGAM = l2_loss()
@@ -331,6 +343,8 @@ for epoch in range(35):
 
         # dilate GAM
         weight_map = generate_weight_map(GAM.cpu().detach().numpy())
+        # Merge weight maps
+        weight_map = merge_weight_map(weight_map)
         weight_map = torch.Tensor(weight_map.reshape((weight_map.shape[0], weight_map.shape[1], -1))).to(device)
 
 

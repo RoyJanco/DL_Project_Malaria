@@ -11,6 +11,8 @@ from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 import numpy as np
 import cv2 as cv
+mpl.use('Qt5Agg')
+
 
 # path = 'MALARIA/Images/4da8f6c5-5f85-4280-92d0-1ba008e8c404.jpg'
 # img = cv.imread(path,0)
@@ -116,8 +118,8 @@ model = localizerVgg.localizervgg16(pretrained=True)
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-state_dict = torch.load('L2_WM_BN_B09.pt', map_location=torch.device(device))
-# state_dict = torch.load('model_aw_wm_b09999_e1.pt', map_location=torch.device(device))
+state_dict = torch.load('L2_WM_BN_AG_B09995_e10.pt', map_location=torch.device(device))
+# state_dict = torch.load('model_l2_b0_e10.pt', map_location=torch.device(device))
 # print(state_dict.keys())
 model.load_state_dict(state_dict)
 model = model.to(device)

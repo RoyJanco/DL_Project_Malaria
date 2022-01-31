@@ -16,8 +16,6 @@ import json
 from collections import Counter
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-object_categories = ['red blood cell', 'leukocyte', 'gametocyte', 'ring', 'trophozoite', 'schizont', 'difficult']
-categories_dict = {'red blood cell': 0, 'leukocyte': 1, 'gametocyte': 2, 'ring': 3, 'trophozoite': 4, 'schizont': 5, 'difficult': 6}
 
 def twoD_Gaussian(m, n, amplitude, sigma_x, sigma_y):
     x = np.linspace(-m, m, 2 * m + 1)
@@ -31,7 +29,7 @@ def twoD_Gaussian(m, n, amplitude, sigma_x, sigma_y):
     b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
     c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
     g = offset + amplitude*np.exp( - (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo)
-                            + c*((y-yo)**2)))
+                                      + c*((y-yo)**2)))
     g[g < np.finfo(g.dtype).eps * g.max()] = 0
     sumg = g.sum()
     if sumg != 0:
@@ -40,12 +38,18 @@ def twoD_Gaussian(m, n, amplitude, sigma_x, sigma_y):
 
 
 class MALARIA(data.Dataset):
-
-    def __init__(self, root, set, train = True):
+    """ classes should be 7 or 2"""
+    def __init__(self, root, set, train = True, num_classes=7):
         self.root = root
         self.path_devkit = os.path.join(root, 'MALARIA')
         self.path_images = os.path.join(root, 'MALARIA', 'Images')
-        self.classes = object_categories
+        self.num_classes = num_classes
+        if num_classes == 7:
+            self.classes = ['red blood cell', 'leukocyte', 'gametocyte', 'ring', 'trophozoite', 'schizont', 'difficult']
+            self.categories_dict = {'red blood cell': 0, 'leukocyte': 1, 'gametocyte': 2, 'ring': 3, 'trophozoite': 4, 'schizont': 5, 'difficult': 6}
+        else:
+            self.classes = ['not infected', 'infected']
+            self.categories_dict = {'not infected': 0, 'infected': 1}
         self.train = train
         id_list_file = os.path.join(self.path_devkit, 'ImageSets/{0}.json'.format(set))
         # Opening JSON file
@@ -58,7 +62,7 @@ class MALARIA(data.Dataset):
         self.bbox = {data_obj['image']['pathname'].replace('/images/', '') : data_obj['objects'] for data_obj in data}
 
         print('MALARIA dataset set=%s number of classes=%03d  number of images=%d' % (
-        set, len(self.classes), len(self.ids)))
+            set, len(self.classes), len(self.ids)))
 
 
     def preprocess(self, img, min_size=720, max_size=1280):
@@ -81,6 +85,16 @@ class MALARIA(data.Dataset):
         bbox[:, 3] = np.round(x_scale * bbox[:, 3])
         return bbox
 
+    def category_to_class(self, category):
+        if self.num_classes == 2:
+            if category in ['red blood cell', 'leukocyte']:
+                return 'not infected'
+            else:
+                return 'infected'
+        elif self.num_classes == 7:
+            return category
+
+
 
     # def read_gt_bbox(self, annoFile):
     #     gt_boxes = []
@@ -94,7 +108,9 @@ class MALARIA(data.Dataset):
         for obj in bbox_data:
             obj_bbox = obj['bounding_box']
             category = obj['category']
-            bbox = [obj_bbox['minimum']['c'], obj_bbox['minimum']['r'], obj_bbox['maximum']['c'], obj_bbox['maximum']['r'], categories_dict[category]]
+            # Convert category to known value
+            category = self.category_to_class(category)
+            bbox = [obj_bbox['minimum']['c'], obj_bbox['minimum']['r'], obj_bbox['maximum']['c'], obj_bbox['maximum']['r'], self.categories_dict[category]]
             gt_boxes.append([int(bbox[0])+1, int(bbox[1])+1, int(bbox[2])-int(bbox[0])+1, int(bbox[3])-int(bbox[1]), int(bbox[4])])
         return gt_boxes
 
@@ -120,19 +136,19 @@ class MALARIA(data.Dataset):
         dSR = 1
 
         # GAM = np.zeros((1, int(o_H / dSR), int(o_W / dSR)))
-        GAM = np.zeros((len(object_categories), int(o_H / dSR), int(o_W / dSR)))
+        GAM = np.zeros((self.num_classes, int(o_H / dSR), int(o_W / dSR)))
 
         # annoFile = open('%s/Annotations/%s.txt' % (self.path_devkit, id_), 'r')
         bbox_data = self.bbox[id_]
         gt_bbox = np.asarray(self.read_gt_bbox(bbox_data))
 
-        # Initialize cells count list according to the dictionary bellow:
-        # {'red blood cell': 0, 'leukocyte': 1, 'gametocyte': 2, 'ring': 3, 'trophozoite': 4, 'schizont': 5, 'difficult': 6}
-        num_cells = [0, 0, 0, 0, 0, 0, 0]
+        # Initialize cells count list
+
+        num_cells = np.zeros(self.num_classes)
         # numCar = 0
 
         if gt_bbox.shape[0] > 0:
-            gt_boxes = np.asarray(self.resize_bbox(gt_bbox, (H, W), (o_H, o_W)), dtype=np.float)
+            gt_boxes = np.asarray(self.resize_bbox(gt_bbox, (H, W), (o_H, o_W)), dtype=float)
 
             gt_boxes[:, 2] = gt_boxes[:, 0] + gt_boxes[:, 2] # rescaled maximum row
             gt_boxes[:, 3] = gt_boxes[:, 1] + gt_boxes[:, 3] # rescaled maximum col
@@ -164,7 +180,7 @@ class MALARIA(data.Dataset):
 
             for bbox in gt_boxes:
                 category = np.int32(bbox[4])
-                bbox = np.asarray(bbox, dtype=np.int)
+                bbox = np.asarray(bbox, dtype=int)
 
                 dhsizeh = int(bbox[3] / 2)
                 dhsizew = int(bbox[2] / 2)
@@ -199,8 +215,8 @@ class MALARIA(data.Dataset):
 
         downsampler = transforms.Compose([transforms.ToPILImage(), transforms.Resize((int(o_H / 8), int(o_W / 8)), interpolation=Image.LANCZOS)])
         #
-        GAM_downsampled = np.zeros((len(object_categories), int(o_H / 8), int(o_W / 8)))
-        for i in range(len(object_categories)):
+        GAM_downsampled = np.zeros((self.num_classes, int(o_H / 8), int(o_W / 8)))
+        for i in range(self.num_classes):
             GAM_downsampled[i] = downsampler(torch.Tensor(GAM[i]))
         # GAM = downsampler(torch.Tensor(GAM[4]))
         GAM_downsampled = np.array(GAM_downsampled)
@@ -211,7 +227,7 @@ class MALARIA(data.Dataset):
         # plt.imshow(img)
         # # # plt.show()
         # # plt.figure(2)
-        # plt.imshow(GAM[4], cmap='jet', alpha=0.4)
+        # plt.imshow(GAM[1], cmap='jet', alpha=0.4)
         # plt.show()
 
         if img.ndim == 2:
@@ -232,16 +248,23 @@ class MALARIA(data.Dataset):
 
     def instances_count(self):
         """Counts number of instances from each class"""
-        counter = {'red blood cell': 0, 'leukocyte': 0, 'gametocyte': 0, 'ring': 0, 'trophozoite': 0,
-                           'schizont': 0, 'difficult': 0}
+
+        # Create counter
+        if self.get_number_classes() == 7:
+            counter = {'red blood cell': 0, 'leukocyte': 0, 'gametocyte': 0, 'ring': 0, 'trophozoite': 0,
+                       'schizont': 0, 'difficult': 0}
+        elif self.get_number_classes() == 2:
+            counter = {'not infected': 0, 'infected': 0}
+
         for img in self.bbox.values():
             for bbox in img:
-                counter[bbox['category']] += 1
+                category = self.category_to_class(bbox['category'])
+                counter[category] += 1
         return counter
 
 
 if __name__ == '__main__':
-    train_dataset = MALARIA('', 'train', train=True)
+    train_dataset = MALARIA('', 'train', train=True, num_classes=2)
     x = train_dataset[26]
     instances = train_dataset.instances_count()
 
