@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 # from MALARIA import MALARIA
 from MALARIA2 import MALARIA
 import localizerVgg
+import utils
 
 
 from scipy.ndimage.filters import maximum_filter, median_filter
@@ -17,42 +18,6 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion, 
 
 # Hyper parameters
 BETA = 0.999
-
-# def detect_peaks(image):
-#     neighborhood = generate_binary_structure(2, 2)
-#     local_max = maximum_filter(image, footprint=neighborhood) == image
-#     background = (image == 0)
-#     eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
-#     detected_peaks = local_max ^ eroded_background
-#     return detected_peaks
-
-def detect_peaks(image):
-    detected_peaks = np.zeros_like(image)
-    local_max = np.zeros_like(image, dtype=bool)
-    max_filter = np.zeros_like(image)
-    neighborhood = generate_binary_structure(2, 2)
-    for i in range(image.shape[0]):
-        max_filter[i] = maximum_filter(image[i], footprint=neighborhood)
-        local_max[i] = maximum_filter(image[i], footprint=neighborhood) == image[i]
-        background = (image[i] == 0)
-        eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
-        detected_peaks[i] = local_max[i] ^ eroded_background
-    plot_peak_maps(max_filter, local_max, image)
-    return detected_peaks
-
-
-def detect_peaks_multi_channels_batch(image):  # TODO: Make this function available in only one script
-    detected_peaks = np.zeros_like(image)
-    neighborhood = generate_binary_structure(2, 2)
-    # Loop for each image in batch
-    for i in range(image.shape[0]):
-        # Loop over classes per image
-        for j in range(image.shape[1]):
-            local_max = maximum_filter(image[i, j], footprint=neighborhood) == image[i, j]
-            background = (image[i, j] == 0)
-            eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
-            detected_peaks[i, j] = local_max ^ eroded_background
-    return detected_peaks
 
 
 class nllloss(nn.Module):
@@ -308,6 +273,7 @@ optimizer_ft = optim.Adam(model.parameters(), lr=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.1)
 model.train()
 
+thr = 0.5
 for epoch in range(35):
 
     scheduler.step(epoch)
@@ -315,31 +281,15 @@ for epoch in range(35):
         data, GAM, num_cells = data.to(device, dtype=torch.float),  GAM.to(device), num_cells.to(device)
 
         MAP = model(data)
-        # if batch_idx % 1 == 0 and epoch % 1 == 0:
-        #     img_vis = data[0].cpu()
-        #     img_vis = (img_vis - img_vis.min()) / (img_vis.max() - img_vis.min())
-        #     vis.image(img_vis, opts=dict(title=str(epoch) + '_' + str(batch_idx) + '_image'))
-        #
-        #     upsampler = transforms.Compose([transforms.ToPILImage(), transforms.Resize((data.shape[2], data.shape[3]))])
-        #     vis_MAP(MAP, vis, epoch, batch_idx, 1, upsampler)
-
-        # Create cMap one class
-        # cMap = MAP[0,].data.cpu().numpy()
-        # cMap_min = cMap.min(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
-        # cMap_max = cMap.max(axis=(1,2)).reshape((cMap.shape[0], 1, 1))
-        # cMap = (cMap - cMap_min) / (cMap_max - cMap_min)
-        # cMap[cMap < 0.1] = 0
-        # # Detect peaks in the predicted heat map:
-        # peakMAPs = detect_peaks_multi_channels(cMap)
 
         # Create cMap for multi class
         cMap = MAP.data.cpu().numpy()
         cMap_min = cMap.min(axis=(2,3)).reshape((cMap.shape[0], cMap.shape[1], 1, 1))
         cMap_max = cMap.max(axis=(2,3)).reshape((cMap.shape[0], cMap.shape[1], 1, 1))
         cMap = (cMap - cMap_min) / (cMap_max - cMap_min)
-        cMap[cMap < 0.1] = 0
+        cMap[cMap < thr] = 0
         # Detect peaks in the predicted heat map:
-        peakMAPs = detect_peaks_multi_channels_batch(cMap) # BUG
+        peakMAPs = utils.detect_peaks_multi_channels_batch(cMap) # BUG
 
         # dilate GAM
         weight_map = generate_weight_map(GAM.cpu().detach().numpy())
@@ -372,7 +322,6 @@ for epoch in range(35):
         optimizer_ft.zero_grad()
         loss.backward()
         optimizer_ft.step()
-
 
         if batch_idx % 1 == 0: # was 20
             # print('Epoch: [{0}][{1}/{2}]\t' 'Loss: {3}\ AE:{4}'
