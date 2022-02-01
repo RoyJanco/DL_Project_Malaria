@@ -39,7 +39,7 @@ class mcloss(nn.Module):
     """Forward: inputs y_pred and y with shape [B, C, H, W]"""
     def forward(self, y_pred, y, Eny):
         y_pred = torch.abs(y_pred - y.float())
-        y_pred_sum = torch.sum(y_pred, axis=2)
+        y_pred_sum = torch.sum(y_pred, dim=2)
         # Divide each class by Effective number of samples
         ret = torch.div(y_pred_sum, Eny)
         # Sum over all elements and normalize
@@ -54,7 +54,7 @@ class l2_loss(nn.Module):
     """Forward: inputs y_pred and y with shape [B, C, H, W]"""
     def forward(self, y_pred, y, Eny):
         y_pred = torch.square(y_pred - y.float())
-        y_pred_sum = torch.sum(y_pred, axis=2)
+        y_pred_sum = torch.sum(y_pred, dim=2)
         # Divide each class by Effective number of samples
         ret = torch.div(y_pred_sum, Eny)
         # Sum over all elements and normalize
@@ -69,7 +69,7 @@ class l2_loss_wm(nn.Module):
     """Forward: inputs y_pred and y with shape [B, C, H, W]"""
     def forward(self, y_pred, y, weight_map=1):
         y_pred = torch.square(y_pred - y.float()) * weight_map
-        y_pred_sum = torch.sum(y_pred, axis=2)
+        y_pred_sum = torch.sum(y_pred, dim=2)
         # Sum over all elements and normalize
         ret = torch.sum(y_pred_sum) / torch.numel(y_pred)
         return ret
@@ -82,7 +82,7 @@ class l3_loss(nn.Module):
     """Forward: inputs y_pred and y with shape [B, C, H, W]"""
     def forward(self, y_pred, y, Eny):
         y_pred = (torch.abs(y_pred - y.float()))**3
-        y_pred_sum = torch.sum(y_pred, axis=2)
+        y_pred_sum = torch.sum(y_pred, dim=2)
         # Divide each class by Effective number of samples
         ret = torch.div(y_pred_sum, Eny)
         # Sum over all elements and normalize
@@ -100,7 +100,7 @@ class shrinkage_loss(nn.Module):
     def forward(self, y_pred, y, Eny):
         l = torch.abs(y_pred - y.float())
         y_pred = torch.square(l) / (1+torch.exp(self.a * (self.c - l)))
-        y_pred_sum = torch.sum(y_pred, axis=2)
+        y_pred_sum = torch.sum(y_pred, dim=2)
         # Divide each class by Effective number of samples
         ret = torch.div(y_pred_sum, Eny)
         # Sum over all elements and normalize
