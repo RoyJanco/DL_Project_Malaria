@@ -12,14 +12,24 @@ from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from PIL import Image
 import utils
+from os import mkdir, path
 
 
-def save_images(img, map, gam, peak_map, batch_idx):
+def get_subdirectory(sd):
+    dir = path.join('figures', sd)
+    if not path.isdir(dir):
+        mkdir(dir)
+    return dir
+
+
+def save_images(img, map, gam, peak_map, batch_idx, path_save):
     # Normalzize img
     img = img.cpu().numpy().squeeze().transpose(1, 2, 0)
     img = np.uint8((img - img.min()) * 255 / (img.max() - img.min()))
     img = Image.fromarray(img)
-    img.save("results/image-batch_" + str(batch_idx) + ".bmp")
+    path_img = path.join(path_save, f'image-batch_{batch_idx}.bmp')
+    img.save(path_img)
+    # img.save("results/image-batch_" + str(batch_idx) + ".bmp")
     # Get first peakmap from the batch
     peak_map = np.uint8(np.array(peak_map[0]) * 255)
     for i in range(map.shape[0]):
@@ -29,9 +39,15 @@ def save_images(img, map, gam, peak_map, batch_idx):
         imb = Image.fromarray(b)
         peakI = Image.fromarray(peak_map[i]).convert("RGB")
         peakI = peakI.resize((1600, 1200))
-        ima.save("results/heatmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
-        imb.save("results/gt_heatmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
-        peakI.save("results/peakmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
+        path_ima = path.join(path_save, f'heatmap-class_{i}_batch_{batch_idx}.bmp')
+        path_imb = path.join(path_save, f'gt_heatmap-class_{i}_batch_{batch_idx}.bmp')
+        path_peak = path.join(path_save, f'peakmap-class_{i}_batch_{batch_idx}.bmp')
+        ima.save(path_ima)
+        imb.save(path_imb)
+        peakI.save(path_peak)
+        # ima.save("results/heatmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
+        # imb.save("results/gt_heatmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
+        # peakI.save("results/peakmap-class_" + str(i) + '-batch_' + str(batch_idx) + ".bmp")
 
 
 def find_inliers(x):
@@ -61,6 +77,9 @@ def plot_graphs(gt, pred):
 
 if __name__ == '__main__':
     NUM_CLASSES = 2
+    model_name = 'c2_l2_b0_e2.pt'
+    # Create sub directory if it does not exist
+    sd_path = get_subdirectory(model_name)
 
     cm_jet = mpl.cm.get_cmap('jet')
     use_cuda = torch.cuda.is_available()
@@ -69,7 +88,7 @@ if __name__ == '__main__':
     # Load pretrained model
 
     dataset = MALARIA('', 'train', train=True, num_classes=NUM_CLASSES)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1204, 4], generator=torch.Generator().manual_seed(42)) # [1100, 108]
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1100, 108], generator=torch.Generator().manual_seed(42)) # [1100, 108]
 
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=0)
 
@@ -118,7 +137,7 @@ if __name__ == '__main__':
                 GAM_norm = GAM[0].data.cpu().contiguous().numpy().copy()
                 MAP_upsampled = utils.upsample_map(MAP_norm, dsr=8)
                 GAM_upsampled = utils.upsample_map(GAM_norm, dsr=8)
-                save_images(data, MAP_upsampled, GAM_upsampled, peakMAPs, batch_idx)
+                save_images(data, MAP_upsampled, GAM_upsampled, peakMAPs, batch_idx, sd_path)
 
         predicted_count = np.array(predicted_count, dtype=int)
         gt_count = np.array(gt_count, dtype=int)

@@ -24,14 +24,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Training models with Pytorch')
     parser.add_argument('--num_classes', '-c', default=2, type=int,
                         help='Number of classes')
-    parser.add_argument('--loss_type', '-l', default='AW', type=str,
+    parser.add_argument('--loss_type', '-l', default='l2', type=str,
                         help='Loss function name: l2 or AW')
     parser.add_argument('--weight_map', '-w', default=False, type=bool,
                         help='Weight map multiplied with loss: True or False')
-    # parser.add_argument('--weight_map', dest='w', action='store_true')
-    # parser.add_argument('--no-weight_map', dest='w', action='store_false')
-    # parser.set_defaults(w=True)
-    parser.add_argument('--beta', '-b', default=0, type=float,
+    parser.add_argument('--beta', '-b', default=0.9, type=float,
                         help='Beta value for balancing the loss function. should be between 0 to 1')
     parser.add_argument('--epochs', '-e', default=1, type=int,
                         help='Number of epochs to run')
@@ -248,7 +245,7 @@ if __name__ == '__main__':
             fark = abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
 
             if args.weight_map:
-                loss = criterionGAM(MAP, GAM, weight_map)
+                loss = criterionGAM(MAP, GAM, weight_map*W + 1)
             else:
                 loss = criterionGAM(MAP, GAM)
 
