@@ -77,7 +77,7 @@ def plot_graphs(gt, pred):
 
 if __name__ == '__main__':
     NUM_CLASSES = 2
-    model_name = 'c-2_l2_b-0.0_e-4.pt'
+    model_name = 'c-2_l2_b-0.0_e-1.pt'
     # Create sub directory if it does not exist
     sd_path = get_subdirectory(model_name)
     saved_model_path = path.join('saved models', model_name)
@@ -100,13 +100,21 @@ if __name__ == '__main__':
     model.eval()
     # Initialize absolute error and MSE accumulators
     # ae, se = torch.zeros(NUM_CLASSES), torch.zeros(NUM_CLASSES)
-    predicted_count, gt_count = [], []
+    # predicted_count, gt_count = [], []
+    # l = []
+
+
     # thr = 0.5
-    # Set threshold as vector
-    thr = [0.5, 0.8]
-    thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
+    # Set threshold as vector - works for 2 classes currently
+    thr_0, thr_1 = np.linspace(0.1, 0.9, num=9), np.linspace(0.1, 0.9, num=9)
+    THR_0, THR_1 = np.meshgrid(thr_0, thr_1)
+    THR_0, THR_1 = THR_0.reshape(-1, 1), THR_1.reshape(-1, 1)
+    thr_vec = np.hstack((THR_0, THR_1))
+    l = np.zeros_like(thr_vec)
+    zero_one_loss = np.zeros_like(thr_vec)
     with torch.no_grad():
         for batch_idx, (data, GAM, num_cells) in enumerate(test_loader, 0):
+            print(f'Batch [{batch_idx}/{len(test_loader)}]')
             data, GAM, num_cells = data.to(device, dtype=torch.float),  GAM.to(device), num_cells.to(device)
             MAP = model(data)
             # Create cMap for multi class
@@ -114,59 +122,37 @@ if __name__ == '__main__':
             cMap_min = cMap.min(axis=(2,3)).reshape((cMap.shape[0], cMap.shape[1], 1, 1))
             cMap_max = cMap.max(axis=(2,3)).reshape((cMap.shape[0], cMap.shape[1], 1, 1))
             cMap = (cMap - cMap_min) / (cMap_max - cMap_min)
-            cMap[cMap < thr] = 0
-            # Detect peaks in the predicted heat map:
-            peakMAPs = utils.detect_peaks_multi_channels_batch(cMap)
 
-            # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
-            # MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
-            # GAM = GAM.view(GAM.shape[0], GAM.shape[1], -1)
-
-            pred_num_cells = np.sum(peakMAPs, axis=(2, 3))
-            pred_num_cells_batch = np.sum(pred_num_cells, axis=0)
+            # Do once for every image
             num_cells_batch = num_cells.cpu().detach().numpy().sum(axis=0)
+            # gt_count.append(num_cells_batch)
 
-            # Append counts to lists
-            predicted_count.append(pred_num_cells_batch)
-            gt_count.append(num_cells_batch)
+            for i, thr in enumerate(thr_vec):
+                thr = thr.reshape(NUM_CLASSES, 1, 1)
+                cMap_tmp = cMap.copy()
+                cMap_tmp[cMap_tmp < thr] = 0
+                # Detect peaks in the predicted heat map:
+                peakMAPs = utils.detect_peaks_multi_channels_batch(cMap_tmp)
 
-            # Average absolute error of cells counting (average over batch)
-            l = abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
+                # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
+                pred_num_cells = np.sum(peakMAPs, axis=(2, 3))
+                pred_num_cells_batch = np.sum(pred_num_cells, axis=0)
 
-            print(f'[{batch_idx}/{len(test_loader)}]\t AE: {l}')
+                # Average absolute error of cells counting (average over batch)
+                l[i] += abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
+                zero_one_loss[i] += (pred_num_cells_batch != num_cells_batch)
 
-            # Save images
-            if batch_idx % 100 == 0:
-                MAP_norm = utils.normalize_map(MAP)
-                GAM_norm = GAM[0].data.cpu().contiguous().numpy().copy()
-                MAP_upsampled = utils.upsample_map(MAP_norm, dsr=8)
-                GAM_upsampled = utils.upsample_map(GAM_norm, dsr=8)
-                save_images(data, MAP_upsampled, GAM_upsampled, peakMAPs, batch_idx, sd_path)
+                # print(f'[{batch_idx}/{len(test_loader)}]\t AE: {l[i]}')
 
-        predicted_count = np.array(predicted_count, dtype=int)
-        gt_count = np.array(gt_count, dtype=int)
+        # Find minimum of the loss
+        min_ind_zero_one = np.argmin(zero_one_loss, axis=0)
+        min_ind_l = np.argmin(l, axis=0)
 
-        total_num_samples = gt_count.shape[0]
-        # Remove outliers
-        inliers = find_inliers(np.abs(predicted_count - gt_count))
-        gt_count = gt_count[inliers, :]
-        predicted_count = predicted_count[inliers, :]
-        inliers_num = gt_count.shape[0]
-        print(f'{total_num_samples - inliers_num} outliers omitted.')
+        optimal_thr_zero_one = (thr_vec[min_ind_zero_one[0], 0], thr_vec[min_ind_zero_one[1], 1])
+        optimal_thr_l = (thr_vec[min_ind_l[0], 0], thr_vec[min_ind_l[1], 1])
 
-        # Plot results
-        plot_graphs(gt_count, predicted_count)
 
-        mean_gt = np.mean(gt_count, axis=0)
-        MAE = np.mean(np.abs(predicted_count - gt_count), axis=0)
-        nMAE = MAE / mean_gt
-        RMSE = np.sqrt(np.mean((predicted_count - gt_count)**2, axis=0))
-        NRMSE = RMSE / mean_gt
+    print(f'Optimal threshold of zero/one error:\n{optimal_thr_zero_one}')
+    print(f'Optimal threshold of absolute error:\n{optimal_thr_l}')
 
-        print('MAE: ', MAE)
-        print('nMAE: ', nMAE)
-        print('RMSE: ', RMSE)
-        print('NRMSE: ', NRMSE)
-
-        print('Done')
 

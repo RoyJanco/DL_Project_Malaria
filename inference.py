@@ -16,8 +16,11 @@ import utils
 if __name__ == '__main__':
     # Inputs
     NUM_CLASSES = 2
-    img_id = 17
-    model_path = 'saved models/c2_l2_b0_e2.pt'
+    img_id = 15
+    # img_id 1 is interesting
+    # model_path = 'saved models/c-2_l2_b-0.9999_wm_e-1.pt'
+    model_path = 'saved models/c-2_l2_b-0.0_e-1.pt'
+    # model_path = 'saved models/c-2_AW_b-0.9999_wm_e-1.pt'
 
     cm_jet = mpl.cm.get_cmap('jet')
     use_cuda = torch.cuda.is_available()
@@ -35,7 +38,10 @@ if __name__ == '__main__':
     model = model.to(device)
     model.eval()
 
-    thr = 0.5
+    # thr = 0.5
+    # Set threshold as vector
+    thr = [0.5, 0.5]
+    thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         # Obtain image
         data, GAM, num_cells = test_dataset.dataset[img_id]
@@ -70,12 +76,15 @@ if __name__ == '__main__':
         num_plots = len(num_cells)
         plt.figure(2)
         for i in range(num_plots):
-            plt.subplot(2, num_plots, i + 1)
+            plt.subplot(3, num_plots, i + 1)
             plt.imshow(GAM_upsampled[i])
             plt.title(f'GT - class [{i}]')
-            plt.subplot(2, num_plots, i + num_plots + 1)
+            plt.subplot(3, num_plots, i + num_plots + 1)
             plt.imshow(MAP_upsampled[i])
             plt.title(f'Pred - class [{i}]')
+            plt.subplot(3, num_plots, i + 2*num_plots + 1)
+            plt.imshow(peak_map[i])
+            plt.title(f'Peak map - class [{i}]')
 
         print(f'Model counted: {pred_num_cells_batch.astype(int)}.')
         print(f'GT: {num_cells.data.cpu().numpy().astype(int)}.')
