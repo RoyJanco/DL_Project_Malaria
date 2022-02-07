@@ -224,7 +224,7 @@ if __name__ == '__main__':
                 # dilate GAM
                 weight_map = generate_weight_map(GAM.cpu().detach().numpy())
                 # Merge weight maps
-                weight_map = merge_weight_map(weight_map)
+                # weight_map = merge_weight_map(weight_map)
                 weight_map = torch.Tensor(weight_map.reshape((weight_map.shape[0], weight_map.shape[1], -1))).to(device)
 
 

@@ -77,7 +77,7 @@ def plot_graphs(gt, pred):
 
 if __name__ == '__main__':
     NUM_CLASSES = 2
-    model_name = 'c-2_l2_b-0.0_e-1.pt'
+    model_name = 'c-2_l2_b-0.99999_wm_e-10.pt'
     # Create sub directory if it does not exist
     sd_path = get_subdirectory(model_name)
     saved_model_path = path.join('saved models', model_name)

@@ -48,7 +48,7 @@ class localizerVGG(nn.Module):
         # layers.append(nn.Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1)))
         # layers.append(nn.LeakyReLU(negative_slope=0.5, inplace=False))
         layers.append(nn.Conv2d(64, num_class, kernel_size=(1, 1), stride=(1, 1)))
-        # layers.append(nn.ReLU( inplace=False))
+        layers.append(nn.ReLU( inplace=False))
         return nn.Sequential(*layers)
 
 

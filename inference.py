@@ -11,16 +11,66 @@ import localizerVgg
 from scipy.ndimage.filters import maximum_filter, median_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from PIL import Image
+from os import path
 import utils
+
+
+def save_images(img, img_marked, map, gam, peak_map, peak_map_gt, path_save):
+    img = Image.fromarray(img)
+    img_marked = Image.fromarray(img_marked)
+    path_img = path.join(path_save, f'image.bmp')
+    path_img_marked = path.join(path_save, f'image_marked.bmp')
+    img.save(path_img)
+    img_marked.save(path_img_marked)
+    for i in range(map.shape[0]):
+        a = map[i]
+        b = gam[i]
+        ima = Image.fromarray(a)
+        imb = Image.fromarray(b)
+        peakI = Image.fromarray(peak_map[i]).convert("RGB")
+        peakI_gt = Image.fromarray(peak_map_gt[i]).convert("RGB")
+        peakI = peakI.resize((1600, 1200))
+        peakI_gt = peakI_gt.resize((1600, 1200))
+
+        path_ima = path.join(path_save, f'heatmap-class_{i}.bmp')
+        path_imb = path.join(path_save, f'gt_heatmap-class_{i}.bmp')
+        path_peak = path.join(path_save, f'peakmap-class_{i}_.bmp')
+        path_peak_gt = path.join(path_save, f'peakmap-GT-class_{i}_.bmp')
+        ima.save(path_ima)
+        imb.save(path_imb)
+        peakI.save(path_peak)
+        peakI_gt.save(path_peak_gt)
+
+
+def mark_peaks(img, peak_maps):
+    image_marked = img.copy()
+    # Mark centers of objects
+    x_class_0, y_class_0 = np.where(peak_maps[0, 0])
+    x_class_1, y_class_1 = np.where(peak_maps[0, 1])
+    for i in range(0, x_class_0.shape[0]):
+        for k in range(-5, 5):
+            for j in range(-5, 5):
+                image_marked[x_class_0[i]*8+k, y_class_0[i]*8+j, 0] = 255
+                image_marked[x_class_0[i]*8+k, y_class_0[i]*8+j, 1:3] = 0
+    for i in range(0, x_class_1.shape[0]):
+        for k in range(-5, 5):
+            for j in range(-5, 5):
+                image_marked[x_class_1[i]*8+k, y_class_1[i]*8+j, 0] = 0
+                image_marked[x_class_1[i]*8+k, y_class_1[i]*8+j, 1] = 255
+                image_marked[x_class_1[i]*8+k, y_class_1[i]*8+j, 2] = 0
+    return image_marked
+
 
 if __name__ == '__main__':
     # Inputs
     NUM_CLASSES = 2
-    img_id = 15
+    img_id = 8
     # img_id 1 is interesting
     # model_path = 'saved models/c-2_l2_b-0.9999_wm_e-1.pt'
-    model_path = 'saved models/c-2_l2_b-0.0_e-1.pt'
-    # model_path = 'saved models/c-2_AW_b-0.9999_wm_e-1.pt'
+    model_path = 'saved models/c-2_l2_b-0.0_e-10.pt'
+    # model_path = 'saved models/c2-l2_relu.pt'
+
+    path_to_save = 'figures/paper'
 
     cm_jet = mpl.cm.get_cmap('jet')
     use_cuda = torch.cuda.is_available()
@@ -40,13 +90,15 @@ if __name__ == '__main__':
 
     # thr = 0.5
     # Set threshold as vector
-    thr = [0.5, 0.5]
+    thr = [0.5, 0.8]
     thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         # Obtain image
         data, GAM, num_cells = test_dataset.dataset[img_id]
         data = data.unsqueeze(dim=0).to(device, dtype=torch.float)
-        GAM = torch.Tensor(GAM).unsqueeze(dim=0).to(device, dtype=torch.float)
+        # GAM = torch.Tensor(GAM).unsqueeze(dim=0).to(device, dtype=torch.float)
+        GAM = np.expand_dims(GAM, axis=0)
+
         MAP = model(data)
         # Create cMap for multi class
         cMap = MAP.data.cpu().numpy()
@@ -56,6 +108,7 @@ if __name__ == '__main__':
         cMap[cMap < thr] = 0
         # Detect peaks in the predicted heat map:
         peakMAPs = utils.detect_peaks_multi_channels_batch(cMap)
+        peakMAPs_gt = utils.detect_peaks_multi_channels_batch(GAM)
 
         # MAP & GAM shape is [B, C, H, W].
 
@@ -63,16 +116,22 @@ if __name__ == '__main__':
         pred_num_cells_batch = np.sum(pred_num_cells, axis=0)
 
         MAP_norm = utils.normalize_map(MAP)
-        GAM_norm = GAM[0].data.cpu().contiguous().numpy().copy()
-
+        # GAM_norm = GAM[0].data.cpu().contiguous().numpy().copy()
+        GAM_norm = GAM[0]
         MAP_upsampled = utils.upsample_map(MAP_norm, dsr=8)
         GAM_upsampled = utils.upsample_map(GAM_norm, dsr=8)
         # Normalize image
         image = np.uint8(255*utils.normalize_image(data))
+
+        # Mark centers of objects
+        image_marked = mark_peaks(image, peakMAPs)
+
+
         peak_map = np.uint8(np.array(peakMAPs[0]) * 255)
+        peak_map_gt = np.uint8(np.array(peakMAPs_gt[0]) * 255)
 
         plt.figure(1)
-        plt.imshow(image)
+        plt.imshow(image_marked)
         num_plots = len(num_cells)
         plt.figure(2)
         for i in range(num_plots):
@@ -85,6 +144,8 @@ if __name__ == '__main__':
             plt.subplot(3, num_plots, i + 2*num_plots + 1)
             plt.imshow(peak_map[i])
             plt.title(f'Peak map - class [{i}]')
+
+        # save_images(image, image_marked, MAP_upsampled, GAM_upsampled, peak_map, peak_map_gt, path_to_save)
 
         print(f'Model counted: {pred_num_cells_batch.astype(int)}.')
         print(f'GT: {num_cells.data.cpu().numpy().astype(int)}.')
