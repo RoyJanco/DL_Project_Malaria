@@ -64,9 +64,9 @@ def mark_peaks(img, peak_maps):
 if __name__ == '__main__':
     # Inputs
     NUM_CLASSES = 2
-    img_id = 8
+    img_id = 23
     # img_id 1 is interesting
-    # model_path = 'saved models/c-2_l2_b-0.9999_wm_e-1.pt'
+    # model_path = 'saved models/c-2_l2_b-0.99999_wm_e-10.pt'
     model_path = 'saved models/c-2_l2_b-0.0_e-10.pt'
     # model_path = 'saved models/c2-l2_relu.pt'
 
@@ -145,7 +145,7 @@ if __name__ == '__main__':
             plt.imshow(peak_map[i])
             plt.title(f'Peak map - class [{i}]')
 
-        # save_images(image, image_marked, MAP_upsampled, GAM_upsampled, peak_map, peak_map_gt, path_to_save)
+        save_images(image, image_marked, MAP_upsampled, GAM_upsampled, peak_map, peak_map_gt, path_to_save)
 
         print(f'Model counted: {pred_num_cells_batch.astype(int)}.')
         print(f'GT: {num_cells.data.cpu().numpy().astype(int)}.')

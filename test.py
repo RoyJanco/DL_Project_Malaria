@@ -76,8 +76,8 @@ def plot_graphs(gt, pred):
 
 
 if __name__ == '__main__':
-    NUM_CLASSES = 2
-    model_name = 'c-2_l2_b-0.0_e-4.pt'
+    NUM_CLASSES = 7
+    model_name = 'c-7_l2_b-0.0_e-10.pt'
     # Create sub directory if it does not exist
     sd_path = get_subdirectory(model_name)
     saved_model_path = path.join('saved models', model_name)
@@ -103,7 +103,8 @@ if __name__ == '__main__':
     predicted_count, gt_count = [], []
     # thr = 0.5
     # Set threshold as vector
-    thr = [0.5, 0.8]
+    # thr = [0.5, 0.8]
+    thr = [0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
     thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         for batch_idx, (data, GAM, num_cells) in enumerate(test_loader, 0):

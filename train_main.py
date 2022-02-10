@@ -22,13 +22,21 @@ import os.path
 def parse_args():
     """Parse script arguments """
     parser = argparse.ArgumentParser(description='Training models with Pytorch')
-    parser.add_argument('--num_classes', '-c', default=2, type=int,
+    parser.add_argument('--num_classes', '-c', default=7, type=int,
                         help='Number of classes')
     parser.add_argument('--loss_type', '-l', default='l2', type=str,
                         help='Loss function name: l2 or AW')
-    parser.add_argument('--weight_map', '-w', default=False, type=bool,
+    parser.add_argument('--weight_map', '-w', default=True, type=bool,
                         help='Weight map multiplied with loss: True or False')
-    parser.add_argument('--beta', '-b', default=0.9, type=float,
+    parser.add_argument('--class_balance', '-cb', default=True, type=bool,
+                        help='Class balance: True or False')
+    # Additional parameters to control the weight instead of beta
+    # parser.add_argument('--weight_0', '-w0', default=0, type=float,
+    #                     help='Weight of foreground pixels for class 0')
+    # parser.add_argument('--weight_1', '-w1', default=0, type=float,
+    #                     help='Weight of foreground pixels for class 1')
+    # End of additional parameters
+    parser.add_argument('--beta', '-b', default=0.999, type=float,
                         help='Beta value for balancing the loss function. should be between 0 to 1')
     parser.add_argument('--epochs', '-e', default=1, type=int,
                         help='Number of epochs to run')
@@ -53,10 +61,10 @@ class Loss(nn.Module):
         self.a = 10
         self.c = 0.2
 
-    def forward(self, y_pred, y, weight_map=1):
+    def forward(self, y_pred, y, weight_map=1, cbt=1):
         if self.loss_type == 'l2':
             y_pred = torch.square(y_pred - y.float()) * weight_map
-            y_pred_sum = torch.sum(y_pred, dim=2)
+            y_pred_sum = torch.sum(y_pred, dim=2) * cbt
             # Sum over all elements and normalize
             ret = torch.sum(y_pred_sum) / torch.numel(y_pred)
             return ret
@@ -164,10 +172,13 @@ def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
 
 
 def get_model_name(arguments):
-    if arguments.weight_map:
-        model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_wm_e-{arguments.epochs}.pt'
-    else:
-        model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_e-{arguments.epochs}.pt'
+    # if arguments.weight_map:
+    #     model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_wm_e-{arguments.epochs}.pt' # Set W from effective number of samples
+    #     # model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_wm_w0-{arguments.weight_0}_w1-{arguments.weight_1}_e-{arguments.epochs}.pt' # Set W directly from main arguments
+    # else:
+    #     # model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_e-{arguments.epochs}.pt'
+    #     model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_cb-{arguments.class_balance}_b-{arguments.beta}_e-{arguments.epochs}.pt'
+    model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_cb-{arguments.class_balance}_wm-{arguments.weight_map}_b-{arguments.beta}_e-{arguments.epochs}.pt'
     return model_name
 
 
@@ -192,9 +203,9 @@ if __name__ == '__main__':
     # Count instances of each class
     ny = torch.DoubleTensor((list(train_dataset.dataset.instances_count().values()))).to(device)
     Eny = (1 - args.beta**ny)/(1 - args.beta)
-    W = torch.unsqueeze(max(Eny) / Eny, dim=1)
-    # W = torch.unsqueeze(1 / (1 - BETA**ny), dim=1)
-    # W2 = torch.unsqueeze(max(ny) / ny, dim=1)
+
+    W = torch.unsqueeze(max(Eny) / Eny, dim=1) # Set W from effective number of samples
+    # W = torch.Tensor([args.weight_0, args.weight_1]).view(-1, 1).to(device) # Set W directly from main arguments
 
     criterionGAM = Loss(args.loss_type, args.weight_map, Eny)
 
@@ -225,11 +236,18 @@ if __name__ == '__main__':
                 weight_map = generate_weight_map(GAM.cpu().detach().numpy())
                 # Merge weight maps
                 # weight_map = merge_weight_map(weight_map)
-                weight_map = torch.Tensor(weight_map.reshape((weight_map.shape[0], weight_map.shape[1], -1))).to(device)
+                weight_map = W * torch.Tensor(weight_map.reshape((weight_map.shape[0], weight_map.shape[1], -1))).to(device) + 1
+            else:
+                weight_map = 1
 
+            if args.class_balance:
+                # Calculate (num_cells + 1) / Eny
+                class_balance_term = (num_cells + 1) / Eny
+            else:
+                class_balance_term = 1
 
-            # if batch_idx % 2 == 0:
-            #     plot_heatmaps(data[0], GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs[0])
+            if batch_idx % 2 == 0:
+                plot_heatmaps(data[0], GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs[0])
 
             # MAP & GAM shape is [B, C, H, W]. Reshape to [B, C, H*W]
             MAP = MAP.view(MAP.shape[0], MAP.shape[1], -1)
@@ -244,10 +262,7 @@ if __name__ == '__main__':
             # Average absolute error of cells counting (average over batch)
             fark = abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
 
-            if args.weight_map:
-                loss = criterionGAM(MAP, GAM, weight_map*W + 1)
-            else:
-                loss = criterionGAM(MAP, GAM)
+            loss = criterionGAM(MAP, GAM, weight_map=weight_map, cbt=class_balance_term)
 
             optimizer_ft.zero_grad()
             loss.backward()
