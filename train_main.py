@@ -28,14 +28,8 @@ def parse_args():
                         help='Loss function name: l2 or AW')
     parser.add_argument('--weight_map', '-w', default=True, type=bool,
                         help='Weight map multiplied with loss: True or False')
-    parser.add_argument('--class_balance', '-cb', default=True, type=bool,
-                        help='Class balance: True or False')
-    # Additional parameters to control the weight instead of beta
-    # parser.add_argument('--weight_0', '-w0', default=0, type=float,
-    #                     help='Weight of foreground pixels for class 0')
-    # parser.add_argument('--weight_1', '-w1', default=0, type=float,
-    #                     help='Weight of foreground pixels for class 1')
-    # End of additional parameters
+    # parser.add_argument('--class_balance', '-cb', default=True, type=bool,
+    #                     help='Class balance: True or False')
     parser.add_argument('--beta', '-b', default=0.999, type=float,
                         help='Beta value for balancing the loss function. should be between 0 to 1')
     parser.add_argument('--epochs', '-e', default=1, type=int,
@@ -61,10 +55,10 @@ class Loss(nn.Module):
         self.a = 10
         self.c = 0.2
 
-    def forward(self, y_pred, y, weight_map=1, cbt=1):
+    def forward(self, y_pred, y, weight_map=1):
         if self.loss_type == 'l2':
             y_pred = torch.square(y_pred - y.float()) * weight_map
-            y_pred_sum = torch.sum(y_pred, dim=2) * cbt
+            y_pred_sum = torch.sum(y_pred, dim=2)
             # Sum over all elements and normalize
             ret = torch.sum(y_pred_sum) / torch.numel(y_pred)
             return ret
@@ -156,7 +150,10 @@ def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
     plt.figure(1)
     plt.imshow(image)
     plt.title('Image')
-    plt.figure(2)
+    if heatmap_gt.shape[0] == 7:
+        plt.figure(2, figsize=(30, 5)) # For 7 classes use this figsize, for 2 classes remove the figsize
+    else:
+        plt.figure(2)
     num_plots = heatmap_gt.shape[0]
     for i in range(num_plots):
         plt.subplot(3, num_plots, i+1)
@@ -172,13 +169,11 @@ def plot_heatmaps(image, heatmap_gt, heatmap_pred, peak_maps):
 
 
 def get_model_name(arguments):
-    # if arguments.weight_map:
-    #     model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_wm_e-{arguments.epochs}.pt' # Set W from effective number of samples
-    #     # model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_wm_w0-{arguments.weight_0}_w1-{arguments.weight_1}_e-{arguments.epochs}.pt' # Set W directly from main arguments
-    # else:
-    #     # model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_e-{arguments.epochs}.pt'
-    #     model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_cb-{arguments.class_balance}_b-{arguments.beta}_e-{arguments.epochs}.pt'
-    model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_cb-{arguments.class_balance}_wm-{arguments.weight_map}_b-{arguments.beta}_e-{arguments.epochs}.pt'
+    if arguments.weight_map:
+        model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_wm_e-{arguments.epochs}.pt' # Set W from effective number of samples
+    else:
+        model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_b-{arguments.beta}_e-{arguments.epochs}.pt'
+    # model_name = f'c-{arguments.num_classes}_{arguments.loss_type}_cb-{arguments.class_balance}_wm-{arguments.weight_map}_b-{arguments.beta}_e-{arguments.epochs}.pt'
     return model_name
 
 
@@ -205,7 +200,6 @@ if __name__ == '__main__':
     Eny = (1 - args.beta**ny)/(1 - args.beta)
 
     W = torch.unsqueeze(max(Eny) / Eny, dim=1) # Set W from effective number of samples
-    # W = torch.Tensor([args.weight_0, args.weight_1]).view(-1, 1).to(device) # Set W directly from main arguments
 
     criterionGAM = Loss(args.loss_type, args.weight_map, Eny)
 
@@ -213,7 +207,11 @@ if __name__ == '__main__':
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.1)
     model.train()
 
-    thr = 0.5
+    if args.num_classes == 2:
+        thr = [0.5, 0.8]
+    elif args.num_classes == 7:
+        thr = [0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
+    thr = np.array(thr).reshape(args.num_classes, 1, 1)
     for epoch in range(args.epochs):
         # scheduler.step(epoch)
         for batch_idx, (data, GAM, num_cells) in enumerate(train_loader):
@@ -240,11 +238,11 @@ if __name__ == '__main__':
             else:
                 weight_map = 1
 
-            if args.class_balance:
-                # Calculate (num_cells + 1) / Eny
-                class_balance_term = (num_cells + 1) / Eny
-            else:
-                class_balance_term = 1
+            # if args.class_balance:
+            #     # Calculate (num_cells + 1) / Eny
+            #     class_balance_term = (num_cells + 1) / Eny
+            # else:
+            #     class_balance_term = 1
 
             if batch_idx % 2 == 0:
                 plot_heatmaps(data[0], GAM[0].cpu().detach().numpy(), MAP[0].cpu().detach().numpy(), peakMAPs[0])
@@ -262,7 +260,8 @@ if __name__ == '__main__':
             # Average absolute error of cells counting (average over batch)
             fark = abs(pred_num_cells_batch - num_cells_batch) / num_cells.shape[0]
 
-            loss = criterionGAM(MAP, GAM, weight_map=weight_map, cbt=class_balance_term)
+            loss = criterionGAM(MAP, GAM, weight_map=weight_map)
+
 
             optimizer_ft.zero_grad()
             loss.backward()

@@ -1,15 +1,9 @@
 import torch
 import numpy as np
-import torch.nn as nn
-from torch.nn import functional as F
-import torchvision.transforms as transforms
-import torch.optim as optim
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from MALARIA2 import MALARIA
 import localizerVgg
-from scipy.ndimage.filters import maximum_filter, median_filter
-from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from PIL import Image
 import utils
 from os import mkdir, path
@@ -61,23 +55,37 @@ def find_inliers(x):
 
 
 def plot_graphs(gt, pred):
-    plt.figure(1)
-    plt.subplot(1, 2, 1)
-    plt.scatter(gt[:, 0], pred[:, 0])
-    plt.ylabel('Model count')
-    plt.xlabel('GT count')
-    plt.title('Not infected cells')
-    plt.subplot(1, 2, 2)
-    plt.scatter(gt[:, 1], pred[:, 1])
-    plt.ylabel('Model count')
-    plt.xlabel('GT count')
-    plt.title('Infected cells')
-    plt.show()
+    if gt.shape[1] == 2:
+        plt.figure(1)
+        plt.subplot(1, 2, 1)
+        plt.scatter(gt[:, 0], pred[:, 0])
+        plt.ylabel('Model count')
+        plt.xlabel('GT count')
+        plt.title('Not infected cells')
+        plt.subplot(1, 2, 2)
+        plt.scatter(gt[:, 1], pred[:, 1])
+        plt.ylabel('Model count')
+        plt.xlabel('GT count')
+        plt.title('Infected cells')
+        plt.show()
+
+    elif gt.shape[1] == 7:
+        plt.figure(1, figsize=(30, 5))
+        for i in range(gt.shape[1]):
+            plt.subplot(1, 7, i+1)
+            plt.scatter(gt[:, i], pred[:, i])
+            plt.ylabel('Model count')
+            plt.xlabel('GT count')
+            plt.title(f'Class {i}')
+        plt.show()
 
 
 if __name__ == '__main__':
-    NUM_CLASSES = 7
-    model_name = 'c-7_l2_b-0.0_e-10.pt'
+    # Set this parameters only when testing #
+    NUM_CLASSES = 2
+    model_name = 'c-2_l2_b-0.0_e-10.pt'
+    ########### End of parameters ###########
+
     # Create sub directory if it does not exist
     sd_path = get_subdirectory(model_name)
     saved_model_path = path.join('saved models', model_name)
@@ -103,8 +111,10 @@ if __name__ == '__main__':
     predicted_count, gt_count = [], []
     # thr = 0.5
     # Set threshold as vector
-    # thr = [0.5, 0.8]
-    thr = [0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
+    if NUM_CLASSES == 2:
+        thr = [0.5, 0.8]
+    elif NUM_CLASSES == 7:
+        thr = [0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
     thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         for batch_idx, (data, GAM, num_cells) in enumerate(test_loader, 0):
@@ -148,12 +158,13 @@ if __name__ == '__main__':
         gt_count = np.array(gt_count, dtype=int)
 
         total_num_samples = gt_count.shape[0]
-        # Remove outliers
-        inliers = find_inliers(np.abs(predicted_count - gt_count))
-        gt_count = gt_count[inliers, :]
-        predicted_count = predicted_count[inliers, :]
-        inliers_num = gt_count.shape[0]
-        print(f'{total_num_samples - inliers_num} outliers omitted.')
+
+        # Remove outliers - Don't use this
+        # inliers = find_inliers(np.abs(predicted_count - gt_count))
+        # gt_count = gt_count[inliers, :]
+        # predicted_count = predicted_count[inliers, :]
+        # inliers_num = gt_count.shape[0]
+        # print(f'{total_num_samples - inliers_num} outliers omitted.')
 
         # Plot results
         plot_graphs(gt_count, predicted_count)

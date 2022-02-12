@@ -90,7 +90,10 @@ if __name__ == '__main__':
 
     # thr = 0.5
     # Set threshold as vector
-    thr = [0.5, 0.8]
+    if NUM_CLASSES == 2:
+        thr = [0.5, 0.8]
+    elif NUM_CLASSES == 7:
+        thr = [0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
     thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         # Obtain image
