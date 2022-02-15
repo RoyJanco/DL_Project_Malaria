@@ -64,12 +64,11 @@ def mark_peaks(img, peak_maps):
 if __name__ == '__main__':
     # Inputs
     NUM_CLASSES = 2
-    img_id = 48
+    img_id = 18
     # img_id 1 is interesting
     # model_path = 'saved models/c-2_l2_b-0.99999_wm_e-10.pt'
-    model_path = 'saved models/c-2_l2_b-0.9999_wm_e-10.pt'
-    # model_path = 'saved models/c-2_l2_b-0.0_e-10.pt'
-    # model_path = 'saved models/c2-l2_relu.pt'
+    # model_path = 'saved models/c-2_l2_b-0.9999_wm_e-10.pt'
+    model_path = 'saved models/c-2_l2_b-0.0_e-10.pt'
 
     path_to_save = 'figures/paper'
 
@@ -98,7 +97,7 @@ if __name__ == '__main__':
     thr = np.array(thr).reshape(NUM_CLASSES, 1, 1)
     with torch.no_grad():
         # Obtain image
-        data, GAM, num_cells = test_dataset.dataset[img_id]
+        data, GAM, num_cells = test_dataset[img_id]
         data = data.unsqueeze(dim=0).to(device, dtype=torch.float)
         # GAM = torch.Tensor(GAM).unsqueeze(dim=0).to(device, dtype=torch.float)
         GAM = np.expand_dims(GAM, axis=0)
@@ -149,7 +148,7 @@ if __name__ == '__main__':
             plt.imshow(peak_map[i])
             plt.title(f'Peak map - class [{i}]')
 
-        # save_images(image, image_marked, MAP_upsampled, GAM_upsampled, peak_map, peak_map_gt, path_to_save)
+        save_images(image, image_marked, MAP_upsampled, GAM_upsampled, peak_map, peak_map_gt, path_to_save)
 
         print(f'Model counted: {pred_num_cells_batch.astype(int)}.')
         print(f'GT: {num_cells.data.cpu().numpy().astype(int)}.')
